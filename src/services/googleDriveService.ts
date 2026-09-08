@@ -169,10 +169,16 @@ async function fetchFolderHtml(folderUrl: string): Promise<string> {
   // Native (Android/iOS): CapacitorHttp performs the request outside the
   // WebView, so it isn't subject to browser CORS restrictions — no proxy needed.
   if (Capacitor.isNativePlatform()) {
+    // Google redirects mobile/Android user agents to a stripped-down
+    // "drive/mobile/..." page that doesn't include the file grid HTML this
+    // parser depends on — force a desktop UA to get the full listing.
     const response = await CapacitorHttp.get({
       url: folderUrl,
       connectTimeout: 15000,
       readTimeout: 20000,
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      },
     });
     if (response.status < 200 || response.status >= 300) {
       throw new Error(`Não foi possível conectar à pasta pública do Google Drive (${response.status}).`);
