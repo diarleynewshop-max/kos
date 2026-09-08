@@ -166,17 +166,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
           epubSpineCountRef.current = Math.max(1, spineCount);
           if (!isMounted) return;
 
-          if (epubSpineCountRef.current !== book.totalPages) {
-            const correctedBook: Book = {
-              ...book,
-              totalPages: epubSpineCountRef.current,
-              currentPage: Math.min(book.currentPage || 1, epubSpineCountRef.current),
-            };
-            await saveBook(correctedBook);
-            onBookUpdated(correctedBook);
-          }
-
-          // Load EPUB navigation (TOC)
+          // Load EPUB navigation (TOC) — independent of page counting, can run in the background
           void epubBook.loaded.navigation.then((nav: any) => {
             if (!isMounted || !nav?.toc) return;
             const mapNav = (items: any[]): PdfOutlineItem[] => {
@@ -189,25 +179,32 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
             setOutline(mapNav(nav.toc));
           }).catch(() => {});
 
-          setLoading(false);
-
-          // Paginate in the background
-          void epubBook.locations.generate(1000).then(async (locations: string[]) => {
+          // Generate the location index BEFORE the reader becomes interactive.
+          // Page numbers are derived from this index; computing it in the
+          // background (after the user starts reading) meant the "current
+          // page" basis flipped mid-session — first from spine-chapter index,
+          // then to this index once it resolved — causing the number to jump
+          // around non-monotonically as pages were turned.
+          try {
+            const locations = await epubBook.locations.generate(1000);
             if (!isMounted) return;
             epubLocationsRef.current = locations;
-            const totalLocations = locations.length || epubSpineCountRef.current;
-            if (totalLocations !== book.totalPages) {
-              const correctedBook: Book = {
-                ...book,
-                totalPages: totalLocations,
-                currentPage: Math.min(book.currentPage || 1, totalLocations),
-              };
-              await saveBook(correctedBook);
-              if (isMounted) onBookUpdated(correctedBook);
-            }
-          }).catch((locationError: unknown) => {
+          } catch (locationError) {
             console.warn('Could not generate EPUB locations:', locationError);
-          });
+          }
+
+          const totalLocations = epubLocationsRef.current.length || epubSpineCountRef.current;
+          if (totalLocations !== book.totalPages) {
+            const correctedBook: Book = {
+              ...book,
+              totalPages: totalLocations,
+              currentPage: Math.min(book.currentPage || 1, totalLocations),
+            };
+            await saveBook(correctedBook);
+            if (isMounted) onBookUpdated(correctedBook);
+          }
+
+          setLoading(false);
           return;
         }
 
