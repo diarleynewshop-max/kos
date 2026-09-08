@@ -15,7 +15,8 @@ import {
   FileText,
   Cloud,
   Globe,
-  Download
+  Download,
+  Settings
 } from 'lucide-react';
 import { loadPdf, extractMetadata, generateThumbnail } from '../services/pdfService';
 import { extractEpubMetadata } from '../services/epubService';
@@ -37,6 +38,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
   onSelectBook,
   onRefreshBooks,
   settings,
+  onOpenGlobalSettings,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTab, setFilterTab] = useState<'all' | 'reading' | 'done' | 'bookmarked' | 'gdrive' | 'archive'>('all');
@@ -366,6 +368,14 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               <Download size={14} />
               <span>APK</span>
             </a>
+            <button
+              onClick={onOpenGlobalSettings}
+              className="p-2 rounded-xl border hover:bg-black/5 active:scale-95 transition"
+              style={{ borderColor }}
+              title="Configurações do App"
+            >
+              <Settings size={16} />
+            </button>
             <div className="flex items-center gap-1 border rounded-lg p-0.5" style={{ borderColor }}>
               <button
                 onClick={() => setViewMode('grid')}

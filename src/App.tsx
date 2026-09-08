@@ -4,6 +4,7 @@ import { getBooks, getSettings, saveSettings, saveBook } from './services/storag
 import { LibraryView } from './components/LibraryView';
 import { ReaderView } from './components/ReaderView';
 import { UpdateBanner } from './components/UpdateBanner';
+import { AppSettingsModal } from './components/AppSettingsModal';
 import { createSamplePdf } from './services/sampleBook';
 import { loadPdf, extractMetadata, generateThumbnail } from './services/pdfService';
 import { checkForUpdate } from './services/updateService';
@@ -13,6 +14,7 @@ export function App() {
   const [books, setBooks] = useState<Book[]>([]);
   const [currentBook, setCurrentBook] = useState<Book | null>(null);
   const [availableUpdate, setAvailableUpdate] = useState<UpdateInfo | null>(null);
+  const [showGlobalSettings, setShowGlobalSettings] = useState<boolean>(false);
   const [settings, setSettings] = useState<ReaderSettings>({
     theme: 'sepia',
     fontSize: 18,
@@ -126,12 +128,18 @@ export function App() {
           onSelectBook={(book) => setCurrentBook(book)}
           onRefreshBooks={refreshLibrary}
           settings={settings}
-          onOpenGlobalSettings={() => {}}
+          onOpenGlobalSettings={() => setShowGlobalSettings(true)}
         />
       )}
       {availableUpdate && (
         <UpdateBanner update={availableUpdate} onDismiss={() => setAvailableUpdate(null)} />
       )}
+      <AppSettingsModal
+        isOpen={showGlobalSettings}
+        onClose={() => setShowGlobalSettings(false)}
+        settings={settings}
+        onUpdateSettings={handleUpdateSettings}
+      />
     </main>
   );
 }
