@@ -341,42 +341,17 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
       {/* Main Header with Search & View Toggle */}
       <div className="px-4 pt-3 pb-2">
         <div className="flex items-center justify-between gap-3 mb-3">
-          <h1 className="text-xl font-serif font-bold tracking-tight">Sua Biblioteca</h1>
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setShowArchiveModal(true)}
-              className="px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 active:scale-95 transition"
-              title="Biblioteca Pública Internet Archive (E-books em Português)"
-            >
-              <Globe size={14} />
-              <span>Archive.org</span>
-            </button>
-            <button
-              onClick={() => setShowDriveModal(true)}
-              className="px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 active:scale-95 transition"
-              title="Importar do Google Drive"
-            >
-              <Cloud size={14} />
-              <span>Drive</span>
-            </button>
-            <a
-              href="/KOS.apk"
-              download="KOS.apk"
-              className="px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 transition shadow-sm"
-              title="Baixar Instalador APK Direto para Celular Android"
-            >
-              <Download size={14} />
-              <span>APK</span>
-            </a>
+          <h1 className="text-xl font-serif font-bold tracking-tight whitespace-nowrap shrink-0">Sua Biblioteca</h1>
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar min-w-0">
             <button
               onClick={onOpenGlobalSettings}
-              className="p-2 rounded-xl border hover:bg-black/5 active:scale-95 transition"
+              className="p-2 rounded-xl border hover:bg-black/5 active:scale-95 transition shrink-0"
               style={{ borderColor }}
               title="Configurações do App"
             >
               <Settings size={16} />
             </button>
-            <div className="flex items-center gap-1 border rounded-lg p-0.5" style={{ borderColor }}>
+            <div className="flex items-center gap-1 border rounded-lg p-0.5 shrink-0" style={{ borderColor }}>
               <button
                 onClick={() => setViewMode('grid')}
                 className={`p-1.5 rounded transition ${viewMode === 'grid' ? 'bg-black/10' : 'opacity-50'}`}
@@ -392,6 +367,31 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                 <List size={16} />
               </button>
             </div>
+            <button
+              onClick={() => setShowArchiveModal(true)}
+              className="px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 text-xs font-semibold text-amber-700 dark:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 active:scale-95 transition shrink-0"
+              title="Biblioteca Pública Internet Archive (E-books em Português)"
+            >
+              <Globe size={14} />
+              <span>Archive.org</span>
+            </button>
+            <button
+              onClick={() => setShowDriveModal(true)}
+              className="px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 text-xs font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 hover:bg-blue-500/20 active:scale-95 transition shrink-0"
+              title="Importar do Google Drive"
+            >
+              <Cloud size={14} />
+              <span>Drive</span>
+            </button>
+            <a
+              href="/KOS.apk"
+              download="KOS.apk"
+              className="px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 transition shadow-sm shrink-0"
+              title="Baixar Instalador APK Direto para Celular Android"
+            >
+              <Download size={14} />
+              <span>APK</span>
+            </a>
           </div>
         </div>
 
