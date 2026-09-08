@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1536" role="img" aria-labelledby="title">
+  <title id="title">KOS</title>
+  <rect width="1024" height="1536" fill="#000"/>
+  <g fill="#fff">
+    <path d="M405 391h32v220h-32z"/>
+    <path d="m455 500 117-109h49L506 500l115 111h-49z"/>
+    <circle cx="512" cy="765" r="108" fill="none" stroke="#fff" stroke-width="30"/>
+    <path d="M486 739h52v91l-26-17-26 17z" fill="#f5a623"/>
+    <path d="M402 929h219v32H437c-25 0-39 11-39 29 0 19 15 29 44 33l109 14c49 6 76 29 76 69 0 47-36 72-91 72H402v-32h132c35 0 56-11 56-38 0-21-16-33-49-37l-107-14c-51-7-77-29-77-68 0-39 26-60 45-60z"/>
+  </g>
+</svg>

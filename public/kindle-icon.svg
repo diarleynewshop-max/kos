@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1e1e1e"/>
+      <stop offset="100%" stop-color="#0c0c0c"/>
+    </linearGradient>
+    <linearGradient id="screenGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f5f3ec"/>
+      <stop offset="100%" stop-color="#e9e5d9"/>
+    </linearGradient>
+    <filter id="dropShadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+  <!-- Background rounded rect -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+  
+  <!-- Kindle Device Frame -->
+  <g filter="url(#dropShadow)">
+    <rect x="100" y="56" width="312" height="400" rx="24" fill="#262626" stroke="#383838" stroke-width="4"/>
+    
+    <!-- Screen -->
+    <rect x="124" y="86" width="264" height="340" rx="6" fill="url(#screenGrad)"/>
+    
+    <!-- Subtle book lines on screen -->
+    <line x1="156" y1="130" x2="332" y2="130" stroke="#3a3731" stroke-width="5" stroke-linecap="round"/>
+    <line x1="156" y1="156" x2="356" y2="156" stroke="#4a463e" stroke-width="4" stroke-linecap="round"/>
+    <line x1="156" y1="178" x2="340" y2="178" stroke="#4a463e" stroke-width="4" stroke-linecap="round"/>
+    <line x1="156" y1="200" x2="352" y2="200" stroke="#4a463e" stroke-width="4" stroke-linecap="round"/>
+    <line x1="156" y1="222" x2="310" y2="222" stroke="#4a463e" stroke-width="4" stroke-linecap="round"/>
+
+    <!-- Open book graphic in center -->
+    <path d="M 216 280 Q 256 270 296 280 L 296 340 Q 256 328 216 340 Z" fill="#2d2b27"/>
+    <path d="M 216 280 Q 176 270 136 280 L 136 340 Q 176 328 216 340 Z" fill="#3a3731"/>
+    
+    <!-- Kindle Logo text at bottom border -->
+    <text x="256" y="442" fill="#7d7d7d" font-family="-apple-system, sans-serif" font-size="14" font-weight="700" letter-spacing="4" text-anchor="middle">KOS</text>
+  </g>
+</svg>

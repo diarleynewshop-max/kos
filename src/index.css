@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --sat: env(safe-area-inset-top);
+    --sar: env(safe-area-inset-right);
+    --sab: env(safe-area-inset-bottom);
+    --sal: env(safe-area-inset-left);
+  }
+
+  html, body, #root {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    touch-action: pan-y pinch-zoom;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+}
+
+/* Kindle Themes */
+.theme-light {
+  --bg-primary: #fbfbf9;
+  --bg-secondary: #f0eee9;
+  --text-primary: #1a1a1a;
+  --text-secondary: #575551;
+  --border-color: #e5e3dc;
+  --toolbar-bg: rgba(251, 251, 249, 0.96);
+}
+
+.theme-sepia {
+  --bg-primary: #f6eedb;
+  --bg-secondary: #ebdcb9;
+  --text-primary: #342718;
+  --text-secondary: #635340;
+  --border-color: #ded0b4;
+  --toolbar-bg: rgba(246, 238, 219, 0.96);
+}
+
+.theme-dark {
+  --bg-primary: #121212;
+  --bg-secondary: #1e1e1e;
+  --text-primary: #e6e6e6;
+  --text-secondary: #a3a3a3;
+  --border-color: #2c2c2c;
+  --toolbar-bg: rgba(22, 22, 22, 0.96);
+}
+
+.theme-eink {
+  --bg-primary: #eae8e3;
+  --bg-secondary: #dfdcd4;
+  --text-primary: #111111;
+  --text-secondary: #444444;
+  --border-color: #c9c5bb;
+  --toolbar-bg: rgba(234, 232, 227, 0.98);
+}
+
+/* Subtle e-ink flash when turning page */
+@keyframes eink-flash {
+  0% { opacity: 1; }
+  40% { opacity: 0.85; filter: contrast(1.3); }
+  100% { opacity: 1; filter: contrast(1); }
+}
+
+.eink-refresh {
+  animation: eink-flash 0.15s ease-out;
+}
+
+/* Safe area padding utilities */
+.pt-safe {
+  padding-top: max(12px, env(safe-area-inset-top));
+}
+
+.pb-safe {
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+/* Hide scrollbar for clean Kindle look */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+

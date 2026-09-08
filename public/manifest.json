@@ -1,0 +1,24 @@
+{
+  "name": "KOS - Kindle Open Source",
+  "short_name": "KOS",
+  "description": "Leitor de PDF minimalista, livre de anúncios e com experiência autêntica de Kindle",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#121212",
+  "theme_color": "#181818",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/kos-logo.svg",
+      "sizes": "1024x1536",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/kindle-icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
