@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  version-matches-tag:
+    # A release whose versionName disagrees with its tag either never offers
+    # the update or offers it forever, since the app compares the two.
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compare versionName with the tag
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          gradle_version=$(sed -n 's/.*versionName[[:space:]]*"\([^"]*\)".*/\1/p' android/app/build.gradle)
+          echo "tag=$tag versionName=$gradle_version"
+          if [ "$tag" != "$gradle_version" ]; then
+            echo "::error::A tag ($tag) não bate com o versionName ($gradle_version) em android/app/build.gradle"
+            exit 1
+          fi

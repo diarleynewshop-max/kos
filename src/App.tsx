@@ -170,6 +170,7 @@ export function App() {
         onClose={() => setShowGlobalSettings(false)}
         settings={settings}
         onUpdateSettings={handleUpdateSettings}
+        onLibraryRestored={refreshLibrary}
       />
     </main>
   );

@@ -1,14 +1,16 @@
-import React, { useEffect, useState } from 'react';
-import { X, Check, Info } from 'lucide-react';
+import React, { useEffect, useRef, useState } from 'react';
+import { X, Check, Info, Upload, Download, AlertTriangle } from 'lucide-react';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import type { ReaderSettings, ThemeMode, FontFamily } from '../types';
+import { exportLibrary, importLibrary } from '../services/backupService';
 
 interface AppSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   settings: ReaderSettings;
   onUpdateSettings: (newSettings: Partial<ReaderSettings>) => void;
+  onLibraryRestored: () => void;
 }
 
 const themes: { id: ThemeMode; name: string; bg: string; text: string; border: string }[] = [
@@ -30,8 +32,13 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
   onClose,
   settings,
   onUpdateSettings,
+  onLibraryRestored,
 }) => {
   const [appVersion, setAppVersion] = useState<string>('');
+  const [backupBusy, setBackupBusy] = useState<boolean>(false);
+  const [backupStatus, setBackupStatus] = useState<string>('');
+  const [backupError, setBackupError] = useState<string>('');
+  const backupInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -44,6 +51,45 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
       setAppVersion('Web (modo de desenvolvimento)');
     }
   }, [isOpen]);
+
+  const handleExport = async () => {
+    setBackupBusy(true);
+    setBackupError('');
+    setBackupStatus('Preparando backup...');
+    try {
+      const summary = await exportLibrary(setBackupStatus);
+      setBackupStatus(
+        summary.path
+          ? `Backup de ${summary.books} livro(s) salvo em ${summary.path}.`
+          : `Backup de ${summary.books} livro(s) gerado.`
+      );
+    } catch (e) {
+      setBackupStatus('');
+      setBackupError(e instanceof Error ? e.message : 'Falha ao exportar a biblioteca.');
+    } finally {
+      setBackupBusy(false);
+    }
+  };
+
+  const handleImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    setBackupBusy(true);
+    setBackupError('');
+    setBackupStatus('Lendo backup...');
+    try {
+      const summary = await importLibrary(file, setBackupStatus);
+      setBackupStatus(`${summary.books} livro(s) restaurado(s).`);
+      onLibraryRestored();
+    } catch (e) {
+      setBackupStatus('');
+      setBackupError(e instanceof Error ? e.message : 'Falha ao restaurar a biblioteca.');
+    } finally {
+      setBackupBusy(false);
+    }
+  };
 
   if (!isOpen) return null;
 
@@ -146,6 +192,62 @@ export const AppSettingsModal: React.FC<AppSettingsModalProps> = ({
               A+
             </button>
           </div>
+        </div>
+
+        {/* Library Backup */}
+        <div className="mb-5 pt-3 border-t" style={{ borderColor: modalBorder }}>
+          <label className="text-xs font-semibold uppercase tracking-wider block opacity-70 mb-1">
+            Backup da Biblioteca
+          </label>
+          <p className="text-[11px] opacity-60 mb-2.5">
+            Seus livros, progresso, marcadores e anotações ficam apenas neste aparelho.
+            Desinstalar o app ou limpar os dados apaga tudo.
+          </p>
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={handleExport}
+              disabled={backupBusy}
+              className="py-2.5 px-3 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40 hover:bg-black/5 active:scale-95 transition"
+              style={{ borderColor: modalBorder }}
+            >
+              <Download size={14} />
+              Exportar
+            </button>
+            <button
+              onClick={() => backupInputRef.current?.click()}
+              disabled={backupBusy}
+              className="py-2.5 px-3 rounded-lg border text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-40 hover:bg-black/5 active:scale-95 transition"
+              style={{ borderColor: modalBorder }}
+            >
+              <Upload size={14} />
+              Restaurar
+            </button>
+          </div>
+
+          <input
+            ref={backupInputRef}
+            type="file"
+            accept=".zip,application/zip"
+            className="hidden"
+            onChange={handleImport}
+          />
+
+          {backupStatus && (
+            <p className="text-[11px] opacity-70 mt-2 flex items-center gap-1.5">
+              {backupBusy && (
+                <span className="w-3 h-3 border-2 border-[#0c66b8] border-t-transparent rounded-full animate-spin shrink-0" />
+              )}
+              {backupStatus}
+            </p>
+          )}
+
+          {backupError && (
+            <p className="text-[11px] text-red-500 mt-2 flex items-start gap-1.5">
+              <AlertTriangle size={13} className="shrink-0 mt-0.5" />
+              {backupError}
+            </p>
+          )}
         </div>
 
         {/* App Version */}

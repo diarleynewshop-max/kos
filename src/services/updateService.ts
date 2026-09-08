@@ -2,6 +2,7 @@ import { Capacitor, registerPlugin } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { downloadBinary } from './downloadService';
+import { isNewer } from './version';
 
 interface ApkUpdaterPlugin {
   installApk(options: { path: string }): Promise<{ started: boolean }>;
@@ -18,27 +19,6 @@ export interface UpdateInfo {
   notes?: string;
 }
 
-function parseVersion(v: string): number[] {
-  return v
-    .trim()
-    .replace(/^v/i, '')
-    .split('.')
-    .map((n) => parseInt(n, 10) || 0);
-}
-
-function isNewer(remote: string, local: string): boolean {
-  const r = parseVersion(remote);
-  const l = parseVersion(local);
-  const len = Math.max(r.length, l.length);
-
-  for (let i = 0; i < len; i += 1) {
-    const rv = r[i] || 0;
-    const lv = l[i] || 0;
-    if (rv !== lv) return rv > lv;
-  }
-
-  return false;
-}
 
 export async function checkForUpdate(): Promise<UpdateInfo | null> {
   if (!Capacitor.isNativePlatform()) return null;

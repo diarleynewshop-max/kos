@@ -39,10 +39,10 @@ export async function saveBook(book: Book, fileData?: ArrayBuffer): Promise<void
     await set(BOOKS_KEY, books);
 
     if (fileData) {
+      // Single copy per book. Older versions also wrote `kos_pdf_<id>`, which
+      // doubled the space every PDF took; getPdfData still reads that key so
+      // books saved by those versions keep working.
       await set(`kos_file_${book.id}`, fileData.slice(0));
-      if (!book.format || book.format === 'pdf') {
-        await set(`kos_pdf_${book.id}`, fileData.slice(0));
-      }
     }
   } catch (err) {
     console.error('Error saving book:', err);
