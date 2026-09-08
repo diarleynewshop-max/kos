@@ -15,7 +15,6 @@ import {
   FileText,
   Cloud,
   Globe,
-  Download,
   Settings
 } from 'lucide-react';
 import { loadPdf, extractMetadata, generateThumbnail } from '../services/pdfService';
@@ -383,15 +382,6 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
               <Cloud size={14} />
               <span>Drive</span>
             </button>
-            <a
-              href="/KOS.apk"
-              download="KOS.apk"
-              className="px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-95 transition shadow-sm shrink-0"
-              title="Baixar Instalador APK Direto para Celular Android"
-            >
-              <Download size={14} />
-              <span>APK</span>
-            </a>
           </div>
         </div>
 
