@@ -22,9 +22,12 @@ public class ApkUpdaterPlugin extends Plugin {
         }
 
         try {
-            File file = new File(path);
+            // `path` arrives as a file:// URI string (from Capacitor Filesystem.getUri),
+            // not a raw filesystem path — parse it to get the real path on disk.
+            String filePath = path.startsWith("file://") ? Uri.parse(path).getPath() : path;
+            File file = new File(filePath);
             if (!file.exists()) {
-                call.reject("Arquivo do APK não encontrado: " + path);
+                call.reject("Arquivo do APK não encontrado: " + filePath);
                 return;
             }
 
