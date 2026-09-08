@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { App as CapacitorApp } from '@capacitor/app';
 import type { Book, ReaderSettings } from './types';
 import { getBooks, getSettings, saveSettings, saveBook } from './services/storage';
 import { LibraryView } from './components/LibraryView';
@@ -26,6 +28,35 @@ export function App() {
     contrastBoost: false,
   });
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
+
+  const currentBookRef = useRef<Book | null>(null);
+  const showGlobalSettingsRef = useRef<boolean>(false);
+
+  useEffect(() => { currentBookRef.current = currentBook; }, [currentBook]);
+  useEffect(() => { showGlobalSettingsRef.current = showGlobalSettings; }, [showGlobalSettings]);
+
+  // Wire up the Android hardware/gesture back button: without this listener,
+  // Capacitor's WebView has no history to go back to and back does nothing,
+  // leaving the user stuck inside a book with no way out but force-closing.
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    const listenerPromise = CapacitorApp.addListener('backButton', () => {
+      if (showGlobalSettingsRef.current) {
+        setShowGlobalSettings(false);
+        return;
+      }
+      if (currentBookRef.current) {
+        setCurrentBook(null);
+        return;
+      }
+      void CapacitorApp.exitApp();
+    });
+
+    return () => {
+      void listenerPromise.then(handle => handle.remove());
+    };
+  }, []);
 
   // Load books and settings on mount
   const refreshLibrary = async () => {
