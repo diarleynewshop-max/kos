@@ -1,6 +1,7 @@
 /**
  * Google Drive integration for local, read-only book imports.
  */
+import { Capacitor, CapacitorHttp } from '@capacitor/core';
 
 export type DriveFileFormat = 'pdf' | 'epub';
 
@@ -164,21 +165,36 @@ export function formatBytes(bytes?: string | number): string {
 }
 
 
-export async function fetchPublicFolderFiles(folderId: string): Promise<DriveReadableFile[]> {
-  const folderUrl = `https://drive.google.com/drive/folders/${folderId}?usp=sharing`;
-  const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(folderUrl)}`;
+async function fetchFolderHtml(folderUrl: string): Promise<string> {
+  // Native (Android/iOS): CapacitorHttp performs the request outside the
+  // WebView, so it isn't subject to browser CORS restrictions — no proxy needed.
+  if (Capacitor.isNativePlatform()) {
+    const response = await CapacitorHttp.get({
+      url: folderUrl,
+      connectTimeout: 15000,
+      readTimeout: 20000,
+    });
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`Não foi possível conectar à pasta pública do Google Drive (${response.status}).`);
+    }
+    return typeof response.data === 'string' ? response.data : '';
+  }
 
-  let html = '';
+  // Web/browser preview: Drive doesn't send CORS headers to arbitrary origins,
+  // so a public CORS proxy is required here.
   try {
+    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(folderUrl)}`;
     const res = await fetch(proxyUrl);
     if (!res.ok) throw new Error(`Falha ao acessar pasta (${res.status})`);
-    html = await res.text();
+    return await res.text();
   } catch {
-    const altProxy = `https://corsproxy.io/?${encodeURIComponent(folderUrl)}`;
-    const res = await fetch(altProxy);
-    if (!res.ok) throw new Error('Não foi possível conectar à pasta pública do Google Drive.');
-    html = await res.text();
+    throw new Error('Não foi possível conectar à pasta pública do Google Drive.');
   }
+}
+
+export async function fetchPublicFolderFiles(folderId: string): Promise<DriveReadableFile[]> {
+  const folderUrl = `https://drive.google.com/drive/folders/${folderId}?usp=sharing`;
+  const html = await fetchFolderHtml(folderUrl);
 
   const sskRegex = /aria-label="([^"]+)"[^>]*ssk=['"][^'"]*?:([a-zA-Z0-9_-]{28,38})-[0-9]+-[0-9]+['"]/g;
   const fileMap = new Map<string, DriveReadableFile>();
