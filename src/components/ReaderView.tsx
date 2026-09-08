@@ -95,6 +95,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
   const currentSpineIndexRef = useRef<number>(0);
   const epubContainerRef = useRef<HTMLDivElement | null>(null);
   const reflowContainerRef = useRef<HTMLDivElement | null>(null);
+  const reflowViewportRef = useRef<HTMLDivElement | null>(null);
   const reflowColumnsRef = useRef<HTMLDivElement | null>(null);
   const landOnLastSubPageRef = useRef<boolean>(false);
   const resetSubPageRef = useRef<boolean>(false);
@@ -121,8 +122,19 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
     settings.fontFamily === 'ember' ? 'font-ember' :
     settings.fontFamily === 'baskerville' ? 'font-baskerville' : 'font-dyslexic';
 
-  const percentRead = Math.round((currentPage / book.totalPages) * 100);
-  const estMinutesRemaining = Math.max(1, Math.round((book.totalPages - currentPage) * 1.5));
+  // In reflow mode `currentPage` only moves when the underlying PDF page or
+  // EPUB chapter changes, so for EPUB (where a chapter spans many locations)
+  // the counter would sit still and then leap. Spread the chapter's span
+  // across its on-screen sub-pages so progress advances with each page turn.
+  const reflowPageSpan = book.format === 'epub'
+    ? Math.max(1, Math.round(book.totalPages / Math.max(1, epubSpineCountRef.current)))
+    : 0;
+  const displayPage = readingMode === 'reflow' && subPageCount > 1
+    ? Math.min(book.totalPages, currentPage + Math.round((subPageIndex / subPageCount) * reflowPageSpan))
+    : currentPage;
+
+  const percentRead = Math.round((displayPage / book.totalPages) * 100);
+  const estMinutesRemaining = Math.max(1, Math.round((book.totalPages - displayPage) * 1.5));
 
   // Sync bookmark state
   useEffect(() => {
@@ -595,18 +607,28 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
   useLayoutEffect(() => {
     if (readingMode !== 'reflow' || book.format === 'images') return;
 
+    const viewportEl = reflowViewportRef.current;
     const columnsEl = reflowColumnsRef.current;
-    if (!columnsEl) return;
+    if (!viewportEl || !columnsEl) return;
 
     const recompute = () => {
-      const width = columnsEl.clientWidth;
-      const height = columnsEl.clientHeight;
-      if (!width || !height) return;
+      // Measure the viewport box, never the columns element itself — the
+      // latter carries the inline height we set here, so reading it back
+      // would just echo our own value instead of the space available.
+      const width = viewportEl.clientWidth;
+      const available = viewportEl.clientHeight;
+      if (!width || !available) return;
+
+      // Round the page height down to a whole number of lines, otherwise the
+      // column boundary slices the last line of text in half.
+      const lineHeightPx = Math.max(1, settings.fontSize * settings.lineHeight);
+      const pageHeight = Math.max(lineHeightPx, Math.floor(available / lineHeightPx) * lineHeightPx);
 
       reflowColWidthRef.current = width;
       columnsEl.style.columnWidth = `${width}px`;
       columnsEl.style.columnGap = `${REFLOW_COLUMN_GAP}px`;
-      columnsEl.style.height = `${height}px`;
+      columnsEl.style.columnFill = 'auto';
+      columnsEl.style.height = `${pageHeight}px`;
 
       const step = width + REFLOW_COLUMN_GAP;
       const count = Math.max(1, Math.round((columnsEl.scrollWidth + REFLOW_COLUMN_GAP) / step));
@@ -633,7 +655,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
     recompute();
 
     const ro = new ResizeObserver(recompute);
-    ro.observe(columnsEl);
+    ro.observe(viewportEl);
     return () => ro.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [readingMode, book.format, reflowSections, settings.fontSize, settings.lineHeight, settings.margin, fontClass]);
@@ -989,7 +1011,8 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
                     </button>
                   </div>
                 ) : (
-                  <div ref={reflowColumnsRef} className="space-y-4">
+                  <div ref={reflowViewportRef} className="w-full h-full overflow-hidden">
+                    <div ref={reflowColumnsRef} className="space-y-4">
                     {reflowSections.map((sec, idx) => {
                       if (sec.type === 'image') {
                         return (
@@ -1060,6 +1083,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
                         </button>
                       </div>
                     )}
+                  </div>
                   </div>
                 )}
               </div>
@@ -1150,7 +1174,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
           className="h-7 w-full flex items-center justify-between px-4 pb-safe text-[11px] font-mono tracking-wide opacity-50 z-30 pointer-events-none"
           style={{ backgroundColor: 'transparent' }}
         >
-          <span>Página {currentPage} de {book.totalPages}</span>
+          <span>Página {displayPage} de {book.totalPages}</span>
           <span>{percentRead}%</span>
           <span>~{estMinutesRemaining} min restantes</span>
         </div>
@@ -1197,7 +1221,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
 
           {/* Bottom Info Bar */}
           <div className="flex justify-between items-center text-xs opacity-75 font-mono px-2 pb-1">
-            <span>Página {currentPage} de {book.totalPages}</span>
+            <span>Página {displayPage} de {book.totalPages}</span>
             <span className="font-semibold">{percentRead}% lido</span>
             <span>{estMinutesRemaining} min restantes</span>
           </div>
