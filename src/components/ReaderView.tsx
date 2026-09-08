@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import ePub from 'epubjs';
 import type { Book, ReaderSettings, PdfOutlineItem, ReflowSection } from '../types';
 import {
@@ -35,6 +35,9 @@ import { ContentsModal } from './ContentsModal';
 import { AnnotationLayer } from './AnnotationLayer';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 
+// Gap (px) between virtual reflow pages, acting as the page's horizontal margin.
+const REFLOW_COLUMN_GAP = 48;
+
 interface ReaderViewProps {
   book: Book;
   settings: ReaderSettings;
@@ -60,6 +63,8 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
   const [reflowSections, setReflowSections] = useState<ReflowSection[]>([]);
   const [currentChapterIndex, setCurrentChapterIndex] = useState<number>(0);
   const [imagePages, setImagePages] = useState<string[]>([]);
+  const [subPageIndex, setSubPageIndex] = useState<number>(0);
+  const [subPageCount, setSubPageCount] = useState<number>(1);
   const [isBookmarked, setIsBookmarked] = useState<boolean>(false);
   const [einkFlashing, setEinkFlashing] = useState<boolean>(false);
   const [isPageLocked, setIsPageLocked] = useState<boolean>(false);
@@ -90,6 +95,11 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
   const currentSpineIndexRef = useRef<number>(0);
   const epubContainerRef = useRef<HTMLDivElement | null>(null);
   const reflowContainerRef = useRef<HTMLDivElement | null>(null);
+  const reflowColumnsRef = useRef<HTMLDivElement | null>(null);
+  const landOnLastSubPageRef = useRef<boolean>(false);
+  const resetSubPageRef = useRef<boolean>(false);
+  const prevSubPageCountRef = useRef<number>(1);
+  const reflowColWidthRef = useRef<number>(0);
 
   // Theme styling helpers
   const themeClass = `theme-${settings.theme}`;
@@ -368,28 +378,6 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
     onBookUpdated({ ...book, currentPage: clamped, readingMode });
   }, [book, currentPage, readingMode, onBookUpdated, triggerEinkFlash]);
 
-  const nextPage = useCallback(() => {
-    if (book.format === 'epub' && readingMode === 'original' && renditionRef.current) {
-      triggerEinkFlash();
-      void renditionRef.current.next();
-      return;
-    }
-    if (currentPage < book.totalPages) {
-      goToPage(currentPage + 1);
-    }
-  }, [book.format, readingMode, currentPage, book.totalPages, goToPage, triggerEinkFlash]);
-
-  const prevPage = useCallback(() => {
-    if (book.format === 'epub' && readingMode === 'original' && renditionRef.current) {
-      triggerEinkFlash();
-      void renditionRef.current.prev();
-      return;
-    }
-    if (currentPage > 1) {
-      goToPage(currentPage - 1);
-    }
-  }, [book.format, readingMode, currentPage, goToPage, triggerEinkFlash]);
-
   // EPUB Chapter-by-chapter navigation (powers Reflow & Transcrição Limpa)
   const goToSpineChapter = useCallback(async (targetSpineIdx: number) => {
     if (!epubBookRef.current) return;
@@ -419,6 +407,80 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
     );
     await goToPage(approxPage);
   }, [book.totalPages, goToPage]);
+
+  // Reflow pagination: advance/retreat one on-screen "slice" of the current
+  // page/chapter's text before falling back to the real page/chapter change.
+  const reflowNext = useCallback(() => {
+    if (subPageIndex < subPageCount - 1) {
+      triggerEinkFlash();
+      setSubPageIndex(i => i + 1);
+      return;
+    }
+    if (book.format === 'epub') {
+      const nextIdx = currentSpineIndexRef.current + 1;
+      if (nextIdx < epubSpineCountRef.current) {
+        triggerEinkFlash();
+        void goToSpineChapter(nextIdx);
+      }
+      return;
+    }
+    if (currentPage < book.totalPages) {
+      triggerEinkFlash();
+      goToPage(currentPage + 1);
+    }
+  }, [subPageIndex, subPageCount, book.format, currentPage, book.totalPages, goToPage, goToSpineChapter, triggerEinkFlash]);
+
+  const reflowPrev = useCallback(() => {
+    if (subPageIndex > 0) {
+      triggerEinkFlash();
+      setSubPageIndex(i => i - 1);
+      return;
+    }
+    if (book.format === 'epub') {
+      const prevIdx = currentSpineIndexRef.current - 1;
+      if (prevIdx >= 0) {
+        triggerEinkFlash();
+        landOnLastSubPageRef.current = true;
+        void goToSpineChapter(prevIdx);
+      }
+      return;
+    }
+    if (currentPage > 1) {
+      triggerEinkFlash();
+      landOnLastSubPageRef.current = true;
+      goToPage(currentPage - 1);
+    }
+  }, [subPageIndex, book.format, currentPage, goToPage, goToSpineChapter, triggerEinkFlash]);
+
+  const nextPage = useCallback(() => {
+    if (readingMode === 'reflow' && book.format !== 'images') {
+      reflowNext();
+      return;
+    }
+    if (book.format === 'epub' && renditionRef.current) {
+      triggerEinkFlash();
+      void renditionRef.current.next();
+      return;
+    }
+    if (currentPage < book.totalPages) {
+      goToPage(currentPage + 1);
+    }
+  }, [readingMode, book.format, reflowNext, currentPage, book.totalPages, goToPage, triggerEinkFlash]);
+
+  const prevPage = useCallback(() => {
+    if (readingMode === 'reflow' && book.format !== 'images') {
+      reflowPrev();
+      return;
+    }
+    if (book.format === 'epub' && renditionRef.current) {
+      triggerEinkFlash();
+      void renditionRef.current.prev();
+      return;
+    }
+    if (currentPage > 1) {
+      goToPage(currentPage - 1);
+    }
+  }, [readingMode, book.format, reflowPrev, currentPage, goToPage, triggerEinkFlash]);
 
   const nextChapter = useCallback(() => {
     if (book.format === 'epub' && epubBookRef.current) {
@@ -477,10 +539,8 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
 
             const sections = await extractEpubChapterSections(epubBookRef.current, spineIdx);
             if (isCurrent) {
+              resetSubPageRef.current = !landOnLastSubPageRef.current;
               setReflowSections(sections);
-              if (reflowContainerRef.current) {
-                reflowContainerRef.current.scrollTop = 0;
-              }
             }
           } catch (err) {
             console.error('Error extracting EPUB reflow sections:', err);
@@ -516,6 +576,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
         try {
           const sections = await extractReflowText(pdfDocRef.current, currentPage);
           if (isCurrent) {
+            resetSubPageRef.current = !landOnLastSubPageRef.current;
             setReflowSections(sections);
           }
         } catch (err) {
@@ -530,6 +591,63 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
       isCurrent = false;
     };
   }, [currentPage, readingMode, loading, settings.autoCrop, settings.contrastBoost, settings.theme, book.format]);
+
+  // Paginate reflow text via CSS columns: slices the extracted text/sections into
+  // discrete on-screen "pages" the exact size of the viewport, so reading never
+  // requires vertical scrolling — only horizontal page turns.
+  useLayoutEffect(() => {
+    if (readingMode !== 'reflow' || book.format === 'images') return;
+
+    const columnsEl = reflowColumnsRef.current;
+    if (!columnsEl) return;
+
+    const recompute = () => {
+      const width = columnsEl.clientWidth;
+      const height = columnsEl.clientHeight;
+      if (!width || !height) return;
+
+      reflowColWidthRef.current = width;
+      columnsEl.style.columnWidth = `${width}px`;
+      columnsEl.style.columnGap = `${REFLOW_COLUMN_GAP}px`;
+      columnsEl.style.height = `${height}px`;
+
+      const step = width + REFLOW_COLUMN_GAP;
+      const count = Math.max(1, Math.round((columnsEl.scrollWidth + REFLOW_COLUMN_GAP) / step));
+
+      let nextIndex: number;
+      if (landOnLastSubPageRef.current) {
+        landOnLastSubPageRef.current = false;
+        nextIndex = count - 1;
+      } else if (resetSubPageRef.current) {
+        resetSubPageRef.current = false;
+        nextIndex = 0;
+      } else {
+        const prevCount = prevSubPageCountRef.current || 1;
+        const ratio = prevCount > 1 ? subPageIndex / (prevCount - 1) : 0;
+        nextIndex = Math.min(Math.max(Math.round(ratio * (count - 1)), 0), count - 1);
+      }
+
+      prevSubPageCountRef.current = count;
+      columnsEl.style.transform = `translateX(-${nextIndex * step}px)`;
+      setSubPageCount(count);
+      setSubPageIndex(nextIndex);
+    };
+
+    recompute();
+
+    const ro = new ResizeObserver(recompute);
+    ro.observe(columnsEl);
+    return () => ro.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readingMode, book.format, reflowSections, settings.fontSize, settings.lineHeight, settings.margin, fontClass]);
+
+  // Slide to the current sub-page whenever it changes (tap/swipe/keyboard navigation).
+  useLayoutEffect(() => {
+    const columnsEl = reflowColumnsRef.current;
+    if (!columnsEl || readingMode !== 'reflow') return;
+    const step = reflowColWidthRef.current + REFLOW_COLUMN_GAP;
+    columnsEl.style.transform = `translateX(-${subPageIndex * step}px)`;
+  }, [subPageIndex, readingMode]);
 
   // Resize listener to re-render original canvas on orientation change
   useEffect(() => {
@@ -604,17 +722,9 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
         return;
       }
       if (diffX > 0) {
-        if (readingMode === 'reflow' && book.format === 'epub') {
-          prevChapter();
-        } else {
-          prevPage();
-        }
+        prevPage();
       } else {
-        if (readingMode === 'reflow' && book.format === 'epub') {
-          nextChapter();
-        } else {
-          nextPage();
-        }
+        nextPage();
       }
     } else if (Math.abs(diffX) < 15 && Math.abs(diffY) < 15) {
       // Tap navigation zones
@@ -624,26 +734,12 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
       if (clickX < screenWidth * 0.22) {
         if (isPageLocked) {
           showToast('🔒 Página Travada');
-        } else if (readingMode === 'reflow' && reflowContainerRef.current) {
-          const el = reflowContainerRef.current;
-          if (el.scrollTop > 20) {
-            el.scrollBy({ top: -window.innerHeight * 0.75, behavior: 'smooth' });
-          } else {
-            prevChapter();
-          }
         } else {
           prevPage();
         }
       } else if (clickX > screenWidth * 0.78) {
         if (isPageLocked) {
           showToast('🔒 Página Travada');
-        } else if (readingMode === 'reflow' && reflowContainerRef.current) {
-          const el = reflowContainerRef.current;
-          if (el.scrollTop + el.clientHeight < el.scrollHeight - 30) {
-            el.scrollBy({ top: window.innerHeight * 0.75, behavior: 'smooth' });
-          } else {
-            nextChapter();
-          }
         } else {
           nextPage();
         }
@@ -664,26 +760,12 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
     if (clickX < screenWidth * 0.22) {
       if (isPageLocked) {
         showToast('🔒 Página Travada');
-      } else if (readingMode === 'reflow' && reflowContainerRef.current) {
-        const el = reflowContainerRef.current;
-        if (el.scrollTop > 20) {
-          el.scrollBy({ top: -window.innerHeight * 0.75, behavior: 'smooth' });
-        } else {
-          prevChapter();
-        }
       } else {
         prevPage();
       }
     } else if (clickX > screenWidth * 0.78) {
       if (isPageLocked) {
         showToast('🔒 Página Travada');
-      } else if (readingMode === 'reflow' && reflowContainerRef.current) {
-        const el = reflowContainerRef.current;
-        if (el.scrollTop + el.clientHeight < el.scrollHeight - 30) {
-          el.scrollBy({ top: window.innerHeight * 0.75, behavior: 'smooth' });
-        } else {
-          nextChapter();
-        }
       } else {
         nextPage();
       }
@@ -887,102 +969,102 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
               </div>
             )}
 
-            {/* Mode 2: Fluid Kindle Reflow Text (PDF Reflow & Transcrição Limpa EPUB) */}
+            {/* Mode 2: Paginated Kindle Reflow Text (PDF Reflow & Transcrição Limpa EPUB).
+                Text is sliced into screen-sized "pages" via CSS columns — reading
+                never scrolls vertically, only horizontal page turns. */}
             {readingMode === 'reflow' && book.format !== 'images' && (
-              <div 
+              <div
                 ref={reflowContainerRef}
-                className={`w-full h-full overflow-y-auto no-scrollbar py-10 ${marginPaddingClass}`}
+                className={`w-full h-full max-w-xl mx-auto relative overflow-hidden box-border py-10 ${marginPaddingClass}`}
               >
-                <div className="max-w-xl mx-auto space-y-4 pb-12">
-                  {reflowSections.length === 0 ? (
-                    <div className="py-20 text-center space-y-4 px-4">
-                      <p className="opacity-70 text-sm">
-                        {book.format === 'epub' 
-                          ? 'Esta página/capítulo não contém blocos de texto contínuo (pode ser capa ou imagem).'
-                          : 'Nenhum texto detectado nesta página.'}
-                      </p>
-                      <button
-                        onClick={nextChapter}
-                        className="px-5 py-2.5 bg-[#0c66b8] text-white rounded-lg text-xs font-semibold shadow-md hover:bg-[#09559c] transition active:scale-95"
-                      >
-                        Avançar para o Próximo Capítulo →
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      {reflowSections.map((sec, idx) => {
-                        if (sec.type === 'image') {
-                          return (
-                            <div key={idx} className="my-6 flex justify-center">
-                              <img 
-                                src={sec.text} 
-                                alt={sec.alt || 'Ilustração'} 
-                                className="max-w-full max-h-[75vh] rounded shadow-md object-contain select-none"
-                                style={{
-                                  filter: 
-                                    settings.theme === 'sepia' ? 'sepia(0.25) contrast(1.05)' :
-                                    settings.theme === 'eink' ? 'grayscale(1) contrast(1.15)' :
-                                    settings.contrastBoost ? 'contrast(1.2)' : 'none'
-                                }}
-                              />
-                            </div>
-                          );
-                        }
-
-                        if (sec.type === 'heading') {
-                          return (
-                            <h2 
-                              key={idx}
-                              className={`font-bold mt-8 mb-3 tracking-tight ${fontClass}`}
-                              style={{ 
-                                fontSize: `${settings.fontSize * 1.3}px`,
-                                lineHeight: settings.lineHeight,
-                              }}
-                            >
-                              {sec.text}
-                            </h2>
-                          );
-                        }
-
+                {reflowSections.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center space-y-4 px-4">
+                    <p className="opacity-70 text-sm">
+                      {book.format === 'epub'
+                        ? 'Esta página/capítulo não contém blocos de texto contínuo (pode ser capa ou imagem).'
+                        : 'Nenhum texto detectado nesta página.'}
+                    </p>
+                    <button
+                      onClick={nextChapter}
+                      className="px-5 py-2.5 bg-[#0c66b8] text-white rounded-lg text-xs font-semibold shadow-md hover:bg-[#09559c] transition active:scale-95"
+                    >
+                      Avançar para o Próximo Capítulo →
+                    </button>
+                  </div>
+                ) : (
+                  <div ref={reflowColumnsRef} className="space-y-4">
+                    {reflowSections.map((sec, idx) => {
+                      if (sec.type === 'image') {
                         return (
-                          <p 
+                          <div key={idx} className="my-6 flex justify-center break-inside-avoid">
+                            <img
+                              src={sec.text}
+                              alt={sec.alt || 'Ilustração'}
+                              className="max-w-full max-h-[75vh] rounded shadow-md object-contain select-none"
+                              style={{
+                                filter:
+                                  settings.theme === 'sepia' ? 'sepia(0.25) contrast(1.05)' :
+                                  settings.theme === 'eink' ? 'grayscale(1) contrast(1.15)' :
+                                  settings.contrastBoost ? 'contrast(1.2)' : 'none'
+                              }}
+                            />
+                          </div>
+                        );
+                      }
+
+                      if (sec.type === 'heading') {
+                        return (
+                          <h2
                             key={idx}
-                            className={`text-justify leading-relaxed tracking-normal ${fontClass}`}
-                            style={{ 
-                              fontSize: `${settings.fontSize}px`,
+                            className={`font-bold mt-8 mb-3 tracking-tight break-inside-avoid ${fontClass}`}
+                            style={{
+                              fontSize: `${settings.fontSize * 1.3}px`,
                               lineHeight: settings.lineHeight,
                             }}
                           >
                             {sec.text}
-                          </p>
+                          </h2>
                         );
-                      })}
+                      }
 
-                      {/* Chapter footer navigation for EPUB in Reflow Mode */}
-                      {book.format === 'epub' && epubSpineCountRef.current > 1 && (
-                        <div className="pt-10 pb-6 border-t border-black/10 dark:border-white/10 flex items-center justify-between gap-3 mt-10">
-                          <button
-                            onClick={prevChapter}
-                            disabled={currentChapterIndex <= 0}
-                            className="px-3.5 py-2 rounded-lg text-xs font-semibold border border-current/20 disabled:opacity-25 hover:bg-black/5 dark:hover:bg-white/5 transition flex items-center gap-1.5"
-                          >
-                            <ChevronLeft size={16} /> Capítulo Anterior
-                          </button>
-                          <span className="text-[11px] opacity-60 font-mono">
-                            Capítulo {currentChapterIndex + 1} de {epubSpineCountRef.current}
-                          </span>
-                          <button
-                            onClick={nextChapter}
-                            disabled={currentChapterIndex >= epubSpineCountRef.current - 1}
-                            className="px-3.5 py-2 bg-[#0c66b8] text-white rounded-lg text-xs font-semibold shadow hover:bg-[#09559c] disabled:opacity-25 transition flex items-center gap-1.5"
-                          >
-                            Próximo Capítulo <ChevronRight size={16} />
-                          </button>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
+                      return (
+                        <p
+                          key={idx}
+                          className={`text-justify leading-relaxed tracking-normal break-inside-avoid ${fontClass}`}
+                          style={{
+                            fontSize: `${settings.fontSize}px`,
+                            lineHeight: settings.lineHeight,
+                          }}
+                        >
+                          {sec.text}
+                        </p>
+                      );
+                    })}
+
+                    {/* Chapter footer navigation for EPUB in Reflow Mode */}
+                    {book.format === 'epub' && epubSpineCountRef.current > 1 && (
+                      <div className="pt-10 pb-6 border-t border-black/10 dark:border-white/10 flex items-center justify-between gap-3 mt-10 break-inside-avoid">
+                        <button
+                          onClick={prevChapter}
+                          disabled={currentChapterIndex <= 0}
+                          className="px-3.5 py-2 rounded-lg text-xs font-semibold border border-current/20 disabled:opacity-25 hover:bg-black/5 dark:hover:bg-white/5 transition flex items-center gap-1.5"
+                        >
+                          <ChevronLeft size={16} /> Capítulo Anterior
+                        </button>
+                        <span className="text-[11px] opacity-60 font-mono">
+                          Capítulo {currentChapterIndex + 1} de {epubSpineCountRef.current}
+                        </span>
+                        <button
+                          onClick={nextChapter}
+                          disabled={currentChapterIndex >= epubSpineCountRef.current - 1}
+                          className="px-3.5 py-2 bg-[#0c66b8] text-white rounded-lg text-xs font-semibold shadow hover:bg-[#09559c] disabled:opacity-25 transition flex items-center gap-1.5"
+                        >
+                          Próximo Capítulo <ChevronRight size={16} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </>
@@ -1090,7 +1172,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
           <div className="flex items-center gap-3">
             <button
               onClick={prevPage}
-              disabled={book.format !== 'epub' && currentPage <= 1}
+              disabled={readingMode === 'reflow' ? subPageIndex <= 0 && currentPage <= 1 : book.format !== 'epub' && currentPage <= 1}
               className="p-2 rounded-full hover:bg-black/10 active:scale-95 disabled:opacity-30 transition"
               title="Página Anterior"
             >
@@ -1108,7 +1190,7 @@ export const ReaderView: React.FC<ReaderViewProps> = ({
 
             <button
               onClick={nextPage}
-              disabled={book.format !== 'epub' && currentPage >= book.totalPages}
+              disabled={readingMode === 'reflow' ? subPageIndex >= subPageCount - 1 && currentPage >= book.totalPages : book.format !== 'epub' && currentPage >= book.totalPages}
               className="p-2 rounded-full hover:bg-black/10 active:scale-95 disabled:opacity-30 transition"
               title="Próxima Página"
             >
